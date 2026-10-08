@@ -1,0 +1,48 @@
+# Conda environment for the GPU cluster (Linux x86_64, CUDA).
+# Identical to environment.yml except torch/torchvision come from the CUDA
+# wheel index. Change cu118 to match the cluster driver (check `nvidia-smi`;
+# torch 2.1.2 ships cu118 and cu121 builds). See environment.yml for why each
+# pin is what it is.
+#
+#   conda env create -f environment.cuda.yml
+#   conda activate cem-probes
+#
+# TensorFlow is only used for small Keras MLPs in the representation metrics,
+# so its CPU build is enough here.
+name: cem-probes
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pip
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu118
+
+      # Deep learning stack
+      - torch==2.1.2+cu118
+      - torchvision==0.16.2+cu118
+      - pytorch-lightning==1.9.5
+      - torchmetrics==0.11.4
+      - tensorflow==2.13.1
+      - typing-extensions==4.5.0
+
+      # Scientific stack
+      - numpy==1.24.3
+      - scipy==1.10.1
+      - scikit-learn==1.3.2
+      - scikit-learn-extra==0.3.0
+      - pandas==2.0.3
+      - matplotlib==3.7.5
+      - seaborn==0.13.2
+
+      # Experiment runner utilities (imported but missing from requirements.txt)
+      - joblib==1.4.2
+      - pyyaml==6.0.2
+      - prettytable==3.11.0
+      - tqdm==4.66.5
+
+      # Optional: uncomment if needed
+      # - wandb                # only with --project_name
+
+      # This repo, editable so edits to cem/ apply without reinstalling
+      - -e .

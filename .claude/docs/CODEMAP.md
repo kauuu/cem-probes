@@ -415,7 +415,7 @@ YAML experiment definitions. Each has `shared_params` (`results_dir`, `trials`, 
 ## Known issues / gotchas
 
 - `experiments/run_experiments.py:113` imports `cem.data.siim_arc_loader`, but that module does not exist in this repo, so the import fails at startup unless the import is removed or the module is added.
-- `cem/metrics/oracle.py` and `cem/train/evaluate.py` import `tensorflow`, but it is not listed in `requirements.txt`/`setup.py`.
+- `cem/metrics/oracle.py` and `cem/train/evaluate.py` import `tensorflow`, and `cem/metrics/cas.py` imports `sklearn_extra`. `tensorflow` is not listed in `requirements.txt`/`setup.py`. Since every trainer imports `evaluate.py`, both packages are required for any training run. `environment.yml` (Mac, osx-64) and `environment.cuda.yml` (cluster) pin compatible versions.
 - In `ConceptEmbeddingModel.__init__`, `inactive_intervention_values` defaults to **ones** (not zeros). This doesn't affect CEM interventions, which use `c_true` directly.
 - `cem/models/base_wrappers.py` and `cem/train/utils.py` both define a `WrapperModule`.
 - MixCEM's `pos_embs`/`neg_embs` are `B × k × 2m` (global ‖ dynamic), unlike CEM's `B × k × m`.

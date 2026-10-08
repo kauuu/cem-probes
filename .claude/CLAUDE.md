@@ -49,7 +49,7 @@ metrics module, not tests). Sanity-check changes with a small local script or
 the synthetic `dot`/`xor`/`trig` configs, which need no downloaded data.
 
 ```bash
-pip install -r requirements.txt && python setup.py install   # Python 3.7-3.8, PyTorch Lightning < 2.0
+CONDA_SUBDIR=osx-64 conda env create -f environment.yml   # local Mac; cluster: environment.cuda.yml
 python experiments/run_experiments.py -c experiments/configs/dot.yaml           # full experiment
 python experiments/run_experiments.py -c <cfg> --filter_in "CEM" -p max_epochs 2  # one run, quick override
 ```
@@ -61,8 +61,10 @@ Useful `run_experiments.py` flags: `-o` (results dir), `-p key value`
 placeholders that must be filled in, or set `DATASET_DIR`.
 
 Imports that will fail out of the box: `experiments/run_experiments.py`
-imports a missing `cem.data.siim_arc_loader`, and `cem/metrics/oracle.py` and
-`cem/train/evaluate.py` need TensorFlow, which is not in `requirements.txt`.
+imports a missing `cem.data.siim_arc_loader`. TensorFlow (missing from
+`requirements.txt`) and scikit-learn-extra are imported at module level by
+`cem/train/evaluate.py`, which every trainer imports, so both are hard
+requirements (both env files include them; see the pin notes there).
 
 ## Architecture (big picture)
 

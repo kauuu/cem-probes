@@ -1,0 +1,53 @@
+# Conda environment for local development (macOS, CPU).
+# For the GPU cluster use environment.cuda.yml (same pins, CUDA torch build).
+#
+#   CONDA_SUBDIR=osx-64 conda env create -f environment.yml
+#   conda activate cem-probes
+#   conda config --env --set subdir osx-64
+#
+# The env is built for Intel macOS (osx-64, runs under Rosetta on Apple
+# Silicon) because scikit-learn-extra has no Python 3.8 arm64 build.
+#
+# Version constraints that shaped these pins:
+# - setup.py: python_requires='>=3.7, <3.9'; pytorch-lightning < 2.0.
+# - cem/train/training.py imports cem/train/evaluate.py, which imports
+#   tensorflow and scikit-learn-extra at module level, so both are required
+#   for any training run, not just for OIS/CAS.
+# - tensorflow 2.13 needs numpy <= 1.24.3 and typing-extensions < 4.6, and
+#   torch >= 2.2 needs typing-extensions >= 4.8, so torch stays at 2.1.2.
+name: cem-probes
+channels:
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pip
+  - pip:
+      # Deep learning stack
+      - torch==2.1.2
+      - torchvision==0.16.2
+      - pytorch-lightning==1.9.5
+      - torchmetrics==0.11.4
+      - tensorflow==2.13.1
+      - typing-extensions==4.5.0
+
+      # Scientific stack
+      - numpy==1.24.3
+      - scipy==1.10.1
+      - scikit-learn==1.3.2
+      - scikit-learn-extra==0.3.0
+      - pandas==2.0.3
+      - matplotlib==3.7.5
+      - seaborn==0.13.2
+
+      # Experiment runner utilities (imported but missing from requirements.txt)
+      - joblib==1.4.2
+      - pyyaml==6.0.2
+      - prettytable==3.11.0
+      - tqdm==4.66.5
+
+      # Optional: uncomment if needed
+      # - wandb                           # only with --project_name
+      # - notebook ipykernel ipywidgets   # examples/*.ipynb
+
+      # This repo, editable so edits to cem/ apply without reinstalling
+      - -e .
