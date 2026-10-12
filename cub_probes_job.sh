@@ -5,7 +5,8 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
 #SBATCH --time=24:00:00
-#SBATCH --output=slurm-%x-%j.out
+#SBATCH --output=logs/slurm/%x-%j.out
+#SBATCH --error=logs/slurm/%x-%j.err
 #
 # Trains the CUB CEM of experiments/configs/probes/cub_cem.yaml and then runs
 # the inter-concept leakage probes on it (experiments/run_probes.py).
@@ -14,6 +15,9 @@
 #   sbatch cub_probes_job.sh /path/to/CUB200            → train + probe
 #   sbatch cub_probes_job.sh /path/to/CUB200 train      → train only
 #   sbatch cub_probes_job.sh /path/to/CUB200 probe      → probe only (needs a trained model)
+# stdout/stderr go to logs/slurm/<job name>-<job id>.{out,err}. SLURM does not
+# create that folder, so it must exist before submitting (it is kept in the
+# repo; otherwise run `mkdir -p logs/slurm`).
 # Any #SBATCH value can be overridden on the command line, e.g.
 #   sbatch --time 08:00:00 cub_probes_job.sh /path/to/CUB200 probe
 #

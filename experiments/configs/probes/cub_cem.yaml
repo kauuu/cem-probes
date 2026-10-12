@@ -66,6 +66,9 @@ shared_params:
   sigmoidal_prob: false
   training_intervention_prob: 0
   num_load_workers: 0
+  # Offline training curves in {results_dir}/logs/CEM_fold_1/version_*/metrics.csv
+  csv_logger: true
+  log_every_n_steps: 25
 
 runs:
   - architecture: "ConceptEmbeddingModel"

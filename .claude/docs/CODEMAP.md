@@ -42,7 +42,7 @@ of output classes.
 | `experiments/` | `run_experiments.py` (main CLI), result collection, evaluation glue, and YAML configs. |
 | `examples/` | A walkthrough notebook training a CEM on the synthetic Dot dataset. |
 | `figures/`, `media/` | Images used in the README; paper poster and slides. |
-| `jupyter_job.sh`, `cub_probes_job.sh` | SLURM helpers for the cluster (`cem-probes` conda env). `cub_probes_job.sh <CUB root> [all\|train\|probe]` is an `sbatch` script that trains `configs/probes/cub_cem.yaml` and/or runs `run_probes.py` on it. |
+| `jupyter_job.sh`, `cub_probes_job.sh` | SLURM helpers for the cluster (`cem-probes` conda env). `cub_probes_job.sh <CUB root> [all\|train\|probe]` is an `sbatch` script that trains `configs/probes/cub_cem.yaml` and/or runs `run_probes.py` on it. Its stdout/stderr go to `logs/slurm/<job>-<id>.{out,err}` (the folder is kept via `.gitkeep`; SLURM won't create it). |
 | `setup.py`, `requirements.txt` | Package install metadata and dependencies (Python 3.7–3.8, PyTorch Lightning < 2.0). |
 
 ---
@@ -228,9 +228,10 @@ Adapted from the official ProbCBM repo.
 | Name | What it does |
 |---|---|
 | `_make_callbacks` `L23` | Early stopping + best-model checkpoint callbacks from the config. |
+| `_make_csv_logger` `L56` | If `config['csv_logger']` is true, returns a Lightning `CSVLogger` writing `{result_dir}/logs/{run}_fold_{n}/version_*/metrics.csv`, flushed on every log call so it can be tailed live. Otherwise returns `False`. Only `train_end_to_end_model`'s main trainer uses it (`log_every_n_steps` is also read from the config, default 50). |
 | `_check_interruption` `L56` | Asks interactively whether to continue after a Ctrl-C. |
 | `_restore_checkpoint` `L72` | Reloads the best validation checkpoint after early stopping. |
-| `train_end_to_end_model` `L91` | Builds, trains (or loads cached) and saves a jointly-trained model (CBM/CEM/IntCEM/…). Saves the `.pt` file, training times, and the config `.joblib`. Returns the model plus train/val/test metrics. |
+| `train_end_to_end_model` `L104` | Builds, trains (or loads cached) and saves a jointly-trained model (CBM/CEM/IntCEM/…). Saves the `.pt` file, training times, and the config `.joblib`. Returns the model plus train/val/test metrics. |
 | `train_sequential_model` `L328` | Two-stage CBM: train x→c, then train c→y on the *predicted* concepts. |
 | `train_independent_model` `L672` | Two-stage CBM: c→y trained on the *ground-truth* concepts. |
 
@@ -426,7 +427,7 @@ YAML experiment definitions. Each has `shared_params` (`results_dir`, `trials`, 
 | Path | Contents |
 |---|---|
 | `configs/*.yaml` | Main experiments per dataset (`cub`, `awa2`, `celeba`, `cifar10`, `mnist_add`, `travelingbirds`, synthetic `xor`/`trig`/`dot`). `*_incomplete.yaml` = concept-incomplete variants. |
-| `configs/probes/cub_cem.yaml` | Thesis config: the CEM run from `cub.yaml` only (1 trial, random group-level interventions, no OOD sets), `results_dir: results/cub_probes/`, plus a `probe_config` block for `run_probes.py`. |
+| `configs/probes/cub_cem.yaml` | Thesis config: the CEM run from `cub.yaml` only (1 trial, random group-level interventions, no OOD sets), `results_dir: results/cub_probes/`, plus a `probe_config` block for `run_probes.py` and `csv_logger: true` for offline training curves. |
 | `configs/hyper_searches/` | Hyperparameter sweep versions of the main configs. |
 | `configs/additional_experiments/ablations/` | Completeness and noise ablations (CUB, AwA2, MixCEM). |
 | `configs/additional_experiments/mnist_domain_shift_experiments/` | Colour-MNIST → SVHN domain-shift experiments. |

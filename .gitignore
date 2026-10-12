@@ -137,3 +137,7 @@ dmypy.json
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# SLURM job logs (folder kept via .gitkeep)
+logs/slurm/*
+!logs/slurm/.gitkeep

@@ -9,7 +9,7 @@ import torch
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import CSVLogger, WandbLogger
 
 import cem.train.utils as utils
 import cem.utils.data as data_utils
@@ -51,6 +51,19 @@ def _make_callbacks(config, result_dir, full_run_name):
             ckpt_callback = callbacks[-1]
 
     return callbacks, ckpt_callback
+
+
+def _make_csv_logger(config, result_dir, full_run_name):
+    # Offline per-epoch metrics, written to
+    # {result_dir}/logs/{full_run_name}/version_{n}/metrics.csv
+    if (not config.get('csv_logger', False)) or (result_dir is None):
+        return False
+    return CSVLogger(
+        save_dir=os.path.join(result_dir, "logs"),
+        name=full_run_name,
+        # Write to disk on every logging call so the file can be tailed live
+        flush_logs_every_n_steps=1,
+    )
 
 
 def _check_interruption(trainer):
@@ -183,7 +196,8 @@ def train_end_to_end_model(
             max_epochs=config['max_epochs'],
             check_val_every_n_epoch=config.get("check_val_every_n_epoch", 5),
             callbacks=callbacks,
-            logger=logger or False,
+            logger=logger or _make_csv_logger(config, result_dir, full_run_name),
+            log_every_n_steps=config.get("log_every_n_steps", 50),
             enable_checkpointing=enable_checkpointing,
             gradient_clip_val=gradient_clip_val,
         )
