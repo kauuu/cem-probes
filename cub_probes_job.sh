@@ -17,12 +17,16 @@
 # Any #SBATCH value can be overridden on the command line, e.g.
 #   sbatch --time 08:00:00 cub_probes_job.sh /path/to/CUB200 probe
 #
-# /path/to/CUB200 is the directory containing class_attr_data_10/ and the
-# CUB images (the dataset_config.root_dir of the config).
+# /path/to/CUB200 (the dataset_config.root_dir of the config) must contain
+#   class_attr_data_10/{train,val,test}.pkl   (copy of cem/data/CUB200/class_attr_data_10/)
+#   CUB_200_2011/images/<class>/<image>.jpg   (the extracted CUB-200-2011 download)
 
 set -euo pipefail
 
 CUB_DIR=${1:?"Usage: sbatch cub_probes_job.sh /path/to/CUB200 [all|train|probe]"}
+# The CUB loader builds image paths by string replacement, so it needs the
+# trailing slash
+CUB_DIR="${CUB_DIR%/}/"
 STAGE=${2:-all}
 CONFIG=experiments/configs/probes/cub_cem.yaml
 NUM_WORKERS=${SLURM_CPUS_PER_TASK:-8}
@@ -35,6 +39,12 @@ export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 
 echo "Node: $(hostname) | Job: ${SLURM_JOB_ID:-local} | Stage: ${STAGE}"
 echo "CUB root: ${CUB_DIR}"
+for required in "${CUB_DIR}class_attr_data_10/train.pkl" "${CUB_DIR}CUB_200_2011/images"; do
+  if [[ ! -e "${required}" ]]; then
+    echo "ERROR: ${required} not found (see the CUB root layout in this script's header)"
+    exit 1
+  fi
+done
 nvidia-smi || true
 python -c "import torch; print('torch', torch.__version__, '| CUDA available:', torch.cuda.is_available())"
 
