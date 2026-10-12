@@ -18,6 +18,7 @@ of output classes.
 - [`cem/train/`](#cemtrain) — training & evaluation routines
 - [`cem/interventions/`](#ceminterventions) — concept intervention policies
 - [`cem/metrics/`](#cemmetrics) — evaluation metrics
+- [`cem/probes/`](#cemprobes) — inter-concept leakage probes (thesis)
 - [`cem/data/`](#cemdata) — dataset loaders
 - [`cem/utils/`](#cemutils) — misc helpers
 - [`experiments/`](#experiments) — experiment runner & configs
@@ -35,6 +36,7 @@ of output classes.
 | `cem/train/` | Training loops for each architecture family and the evaluation routines (task/concept accuracy, representation metrics). |
 | `cem/interventions/` | Test-time concept intervention policies (random, uncertainty, CooP, behavioural cloning, …) and the intervention evaluation harness. |
 | `cem/metrics/` | Accuracy/AUC helpers plus representation-quality metrics (OIS, NIS, CAS) and fairness metrics. |
+| `cem/probes/` | Thesis code: collects a trained CEM's per-concept embeddings, trains linear inter-concept probes and plots the leakage matrices. |
 | `cem/data/` | One loader module per dataset, each exposing a common `generate_data(...)` API. |
 | `cem/utils/` | Small shared helpers (e.g. loading a whole DataLoader into memory). |
 | `experiments/` | `run_experiments.py` (main CLI), result collection, evaluation glue, and YAML configs. |
@@ -58,6 +60,12 @@ experiments/run_experiments.py  main()
               ├─ cem/train/evaluate.py evaluate_cbm()            (task/concept acc/AUC)
               ├─ cem/interventions/utils.py test_interventions() (intervention curves)
               └─ cem/train/evaluate.py evaluate_representation_metrics()  (OIS / NIS / CAS)
+
+experiments/run_probes.py  main()          (after training, same config)
+  ├─ _generate_dataset_and_update_config()  (train split without augmentation)
+  ├─ cem/probes/embeddings.py load_or_collect_embeddings()  → {result_dir}/probes/*_embs_{split}.npz
+  ├─ cem/probes/linear.py leakage_matrices()                → *_probes.joblib (M, oracle O, M - O)
+  └─ cem/probes/plotting.py plot_leakage_figure() / plot_group_summary()  → *.png, *_summary.json
 ```
 
 ---
@@ -320,6 +328,27 @@ Note: `oracle.py` and `train/evaluate.py` use **TensorFlow/Keras** for the helpe
 
 ---
 
+## `cem/probes/`
+
+Inter-concept leakage probing for the thesis. **Matrix convention:** entry
+`(i, j)` = how well concept `i` (row, target) is predicted from concept
+embedding `j` (column, source). This is the transpose of
+`cem/metrics/oracle.py::concept_purity_matrix`.
+
+| File | Function | What it does |
+|---|---|---|
+| `embeddings.py` | `collect_embeddings` `L10` | Runs a trained CEM's `_forward` (no interventions, `output_embeddings=True`) over a dataloader. Returns `pos`, `neg`, `mixed` (the bottleneck, `p·pos + (1−p)·neg`), all N × k × m, plus `c_pred`, `c_true`, `y_true`. |
+| | `load_or_collect_embeddings` `L67` | Same for several dataloaders, cached as `{output_dir}/{run_name}_split_{n}_embs_{train,val,test}.npz`. The model is only loaded if something is missing. |
+| `linear.py` | `batched_auc` `L21` | Tie-aware ROC-AUC (rank-based) of N × k_src × k_tgt scores against N × k_tgt labels. NaN for single-class targets. |
+| | `probe_auc_matrix` `L95` | Trains all k × k logistic-regression probes at once as a k × d × k weight tensor (Adam, full einsum). Inputs are standardised with train stats. The L2 penalty is picked per pair on val, and the test AUC is reported. Returns `test_auc`, `val_auc` and `weight_decay`, each k × k (target × source). |
+| | `leakage_matrices` `L189` | Runs `probe_auc_matrix` for the `oracle` (input = ground-truth `c_j`) and for each requested embedding space (`pos_neg` = pos ‖ neg (2m), `pos`, `neg`, `mixed`). Adds `leakage` = M − O. |
+| `plotting.py` | `group_blocks` `L14` | Concept order that makes every group contiguous, plus each group's `(name, start, size)`. |
+| | `group_membership` / `group_matrix` / `within_between_summary` `L44/L57/L82` | Same-group mask, G × G block aggregation (diagonal ignored), and within- vs between-group value split. |
+| | `plot_concept_matrix` `L99` | k × k heatmap sorted by group, with a red box around each within-group diagonal block and group-name ticks. |
+| | `plot_leakage_figure` / `plot_group_summary` `L178/L228` | The M / O / M − O panels, and the group-mean leakage matrix + within/between box plot. |
+
+---
+
 ## `cem/data/`
 
 **Common loader API.** Every dataset module exposes `generate_data(config, root_dir, seed, output_dataset_vars, train/val/test_sample_transform, …)`. It returns `train_dl, val_dl, test_dl, imbalance` and, when `output_dataset_vars=True`, also `(n_concepts, n_tasks, concept_group_map)`. Batches are `(x, y, c)`. The dataset is chosen in `experiments/run_experiments.py` by `dataset_config.dataset`. Most loaders read their root from the `DATASET_DIR` env var.
@@ -357,6 +386,7 @@ Note: `oracle.py` and `train/evaluate.py` use **TensorFlow/Keras** for the helpe
 | `run_experiments.py` | **Main CLI** (`python experiments/run_experiments.py -c <config.yaml>`). |
 | `evaluate_models.py` | `evaluate_model` `L9`: per-run evaluation glue. Runs `evaluate_cbm` on every test set (incl. OOD `additional_test_sets`), the additional metrics, `test_interventions`, and `evaluate_representation_metrics`. |
 | `experiment_utils.py` | Config and result helpers (see below). |
+| `run_probes.py` | **Leakage-probe CLI** (`python experiments/run_probes.py -c <config.yaml> [--run_name CEM] [--split 0]`). Rebuilds the run config/data exactly like `run_experiments.py` (`_build_run_config` `L42` mirrors `main`), loads the trained model, then runs `cem/probes/` end to end. Reads `probe_config` (`inputs`, `weight_decays`, `epochs`, `learning_rate`, `batch_size`). Flags: `-o`, `--rerun` (embeddings + probes), `--rerun_probes`, `--force_cpu`, `-p`. |
 | `collect_results.py` | CLI to summarise finished experiments, do model selection, and emit a new config with only the selected runs (`construct_selected_config` `L174`, YAML dump helpers `FlowList`, `IndentDumper`, `QuotedString`, …). |
 
 **`run_experiments.py` functions**
@@ -386,15 +416,16 @@ Note: `oracle.py` and `train/evaluate.py` use **TensorFlow/Keras** for the helpe
 | `evaluate_expressions` `L390` | Resolves `"{other_key}"` templates and `"{{ expr }}"` Python expressions inside config values. |
 | `initialize_result_directory` `L415` | Creates `models/` and `history/` subdirectories. |
 | `has_/get_hierarchical_key`, `flatten_dictionary`, `nested_dictionary_set` `L431–L469` | Dotted-key access helpers for nested configs. |
-| `generate_hyperparameter_configs` `L482` | Expands list-valued config entries into the Cartesian product of run configs. |
+| `generate_hyperparameter_configs` `L482` | Expands only the keys listed in `grid_variables` (each must be a list) into run configs: Cartesian product (`grid_search_mode: exhaustive`, default) or zipped (`paired`). Without `grid_variables` it returns the config unchanged. |
 
 ### `experiments/configs/`
 
-YAML experiment definitions. Each has `shared_params` (`results_dir`, `trials`, `dataset_config`, `intervention_config`, `eval_config`, training params) and a `runs:` list (one entry per model, with `architecture`, `run_name` and overrides; list values = hyperparameter grid). Placeholders such as `root_dir: "/path/to/..."` must be filled in.
+YAML experiment definitions. Each has `shared_params` (`results_dir`, `trials`, `dataset_config`, `intervention_config`, `eval_config`, training params) and a `runs:` list (one entry per model, with `architecture`, `run_name` and overrides; keys listed in `grid_variables` form the hyperparameter grid, and `run_name` can template them, e.g. `"CEM_{emb_size}"`). Placeholders such as `root_dir: "/path/to/..."` must be filled in.
 
 | Path | Contents |
 |---|---|
 | `configs/*.yaml` | Main experiments per dataset (`cub`, `awa2`, `celeba`, `cifar10`, `mnist_add`, `travelingbirds`, synthetic `xor`/`trig`/`dot`). `*_incomplete.yaml` = concept-incomplete variants. |
+| `configs/probes/cub_cem.yaml` | Thesis config: the CEM run from `cub.yaml` only (1 trial, random group-level interventions, no OOD sets), `results_dir: results/cub_probes/`, plus a `probe_config` block for `run_probes.py`. |
 | `configs/hyper_searches/` | Hyperparameter sweep versions of the main configs. |
 | `configs/additional_experiments/ablations/` | Completeness and noise ablations (CUB, AwA2, MixCEM). |
 | `configs/additional_experiments/mnist_domain_shift_experiments/` | Colour-MNIST → SVHN domain-shift experiments. |
@@ -414,7 +445,9 @@ YAML experiment definitions. Each has `shared_params` (`results_dir`, `trials`, 
 
 ## Known issues / gotchas
 
-- `experiments/run_experiments.py:113` imports `cem.data.siim_arc_loader`, but that module does not exist in this repo, so the import fails at startup unless the import is removed or the module is added.
+- `cem.data.siim_arc_loader` does not exist in this repo. `experiments/run_experiments.py` now imports it inside a `try/except` and only raises if a `siim` dataset is requested.
+- `run_experiments.py` reads `results_dir` from the **top level** of the YAML (`loaded_config['results_dir']`), so configs that only set it under `shared_params` (e.g. `cub.yaml`) crash unless `-o` is passed.
+- `load_trained_model` calls `torch.load` without `map_location`, so a checkpoint saved on GPU can only be loaded on a machine with CUDA.
 - `cem/metrics/oracle.py` and `cem/train/evaluate.py` import `tensorflow`, and `cem/metrics/cas.py` imports `sklearn_extra`. `tensorflow` is not listed in `requirements.txt`/`setup.py`. Since every trainer imports `evaluate.py`, both packages are required for any training run. `environment.yml` (Mac, osx-64) and `environment.cuda.yml` (cluster) pin compatible versions.
 - In `ConceptEmbeddingModel.__init__`, `inactive_intervention_values` defaults to **ones** (not zeros). This doesn't affect CEM interventions, which use `c_true` directly.
 - `cem/models/base_wrappers.py` and `cem/train/utils.py` both define a `WrapperModule`.

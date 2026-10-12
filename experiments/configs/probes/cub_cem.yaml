@@ -1,0 +1,76 @@
+# CEM on CUB for the inter-concept leakage probing study.
+#
+# Same CEM run and shared params as experiments/configs/cub.yaml, but with only
+# the CEM run, no OOD test sets and only the random (group-level) intervention
+# baseline. Train with:
+#   python experiments/run_experiments.py -c experiments/configs/probes/cub_cem.yaml
+# and then probe the trained model with:
+#   python experiments/run_probes.py -c experiments/configs/probes/cub_cem.yaml
+trials: 1
+results_dir: "results/cub_probes/"
+
+shared_params:
+  model_selection_trials: 1
+  dataset_config:
+    dataset: "cub"
+    num_workers: 8
+    batch_size: 64
+    root_dir: "/path/to/CUB200/" # REPLACE ME
+    sampling_percent: 1
+    sampling_groups: true
+    test_subsampling: 1
+    weight_loss: true
+  intervention_config:
+    competence_levels: [1]
+    intervention_freq: 1
+    intervention_batch_size: 512
+    val_intervention_policies:
+      - policy: "random"
+        group_level: true
+        use_prior: false
+    intervention_policies:
+      - policy: "random"
+        group_level: true
+        use_prior: false
+
+  # Inter-concept leakage probes (used by experiments/run_probes.py only)
+  probe_config:
+    # Embedding spaces to probe: "pos_neg" (pos || neg, 2m) and/or "mixed"
+    # (the bottleneck c~_j fed to the label predictor, m)
+    inputs: ["pos_neg", "mixed"]
+    # L2 penalties tried for every probe; the best one per (i, j) is picked
+    # on the validation split
+    weight_decays: [0.0, 1.0e-4, 1.0e-3, 1.0e-2]
+    epochs: 300
+    learning_rate: 0.01
+    batch_size: 4096
+
+  skip_repr_evaluation: true
+  max_epochs: 150
+  top_k_accuracy: null
+  save_model: true
+  patience: 15
+  emb_size: 16
+  extra_dims: 0
+  concept_loss_weight: 1
+  learning_rate: 0.01
+  weight_decay: 4.0e-06
+  weight_loss: true
+  c_extractor_arch: "resnet18"
+  optimizer: "sgd"
+  bool: false
+  early_stopping_monitor: "val_loss"
+  early_stopping_mode: "min"
+  early_stopping_delta: 0.0
+  momentum: 0.9
+  sigmoidal_prob: false
+  training_intervention_prob: 0
+  num_load_workers: 0
+
+runs:
+  - architecture: "ConceptEmbeddingModel"
+    run_name: "CEM"
+    concept_loss_weight: 1
+    sigmoidal_prob: true
+    training_intervention_prob: 0.25
+    embedding_activation: "leakyrelu"

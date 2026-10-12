@@ -110,7 +110,11 @@ import cem.data.cifar_10_loader as cifar_10_data_module
 import cem.data.color_mnist_add as color_mnist_data_module
 import cem.data.CUB200.cub_loader as cub_data_module
 import cem.data.mnist_add as mnist_data_module
-import cem.data.siim_arc_loader as siim_arc_data_module
+try:
+    # Not shipped with this repository
+    import cem.data.siim_arc_loader as siim_arc_data_module
+except ImportError:
+    siim_arc_data_module = None
 import cem.data.traffic_loader as traffic_data_module
 import cem.data.waterbirds_loader as waterbirds_data_module
 import cem.train.train_blackbox as train_blackbox
@@ -261,6 +265,8 @@ def _generate_dataset_and_update_config(
     elif ds_name == "traffic":
         data_module = traffic_data_module
     elif ds_name in ["siim_arc", "siim-arc", "siim"]:
+        if siim_arc_data_module is None:
+            raise ValueError("cem.data.siim_arc_loader is not available!")
         data_module = siim_arc_data_module
     elif ds_name in ['cifar10', 'cifar_10']:
         data_module = cifar_10_data_module

@@ -60,8 +60,9 @@ Useful `run_experiments.py` flags: `-o` (results dir), `-p key value`
 `--no_new_runs`. Dataset configs contain `root_dir: "/path/to/..."`
 placeholders that must be filled in, or set `DATASET_DIR`.
 
-Imports that will fail out of the box: `experiments/run_experiments.py`
-imports a missing `cem.data.siim_arc_loader`. TensorFlow (missing from
+`experiments/run_experiments.py` imports the missing
+`cem.data.siim_arc_loader` optionally (it only fails if a `siim` dataset is
+requested). TensorFlow (missing from
 `requirements.txt`) and scikit-learn-extra are imported at module level by
 `cem/train/evaluate.py`, which every trainer imports, so both are hard
 requirements (both env files include them; see the pin notes there).
@@ -72,7 +73,8 @@ requirements (both env files include them; see the pin notes there).
 easy to miss:
 
 - **Config-driven pipeline.** `run_experiments.main` loops trials × `runs` ×
-  hyperparameter grid (list-valued keys expand to a Cartesian product).
+  hyperparameter grid (only keys named in a run's `grid_variables` are
+  expanded; other list values are passed through as lists).
   `_multiprocess_run_trial` builds data, picks a trainer by `architecture`
   (CEM uses `cem/train/training.py::train_end_to_end_model`), and then calls
   `experiments/evaluate_models.py::evaluate_model` (accuracy, intervention
