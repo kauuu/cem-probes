@@ -42,6 +42,7 @@ of output classes.
 | `experiments/` | `run_experiments.py` (main CLI), result collection, evaluation glue, and YAML configs. |
 | `examples/` | A walkthrough notebook training a CEM on the synthetic Dot dataset. |
 | `figures/`, `media/` | Images used in the README; paper poster and slides. |
+| `jupyter_job.sh`, `cub_probes_job.sh` | SLURM helpers for the cluster (`cem-probes` conda env). `cub_probes_job.sh <CUB root> [all\|train\|probe]` is an `sbatch` script that trains `configs/probes/cub_cem.yaml` and/or runs `run_probes.py` on it. |
 | `setup.py`, `requirements.txt` | Package install metadata and dependencies (Python 3.7–3.8, PyTorch Lightning < 2.0). |
 
 ---
