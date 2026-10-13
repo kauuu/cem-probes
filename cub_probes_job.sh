@@ -3,7 +3,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=12G
+#SBATCH --mem=32G
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/slurm/%x-%j.out
 #SBATCH --error=logs/slurm/%x-%j.err
@@ -13,7 +13,7 @@
 #
 # Usage (from the repository root):
 #   sbatch cub_probes_job.sh                            → train + probe
-#   sbatch cub_probes_job.sh train                      → train only
+#   sbatch cub                        → train only
 #   sbatch cub_probes_job.sh probe                      → probe only (needs a trained model)
 #   sbatch cub_probes_job.sh /path/to/CUB200 [stage]    → same, with another CUB root
 # Any #SBATCH value can be overridden on the command line, e.g.
