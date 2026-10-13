@@ -42,7 +42,7 @@ of output classes.
 | `experiments/` | `run_experiments.py` (main CLI), result collection, evaluation glue, and YAML configs. |
 | `examples/` | A walkthrough notebook training a CEM on the synthetic Dot dataset. |
 | `figures/`, `media/` | Images used in the README; paper poster and slides. |
-| `jupyter_job.sh`, `cub_probes_job.sh` | SLURM helpers for the cluster (`cem-probes` conda env). `cub_probes_job.sh <CUB root> [all\|train\|probe] [RUN_NAME ...]` is an `sbatch` script that trains the named runs of `configs/probes/cub_cem.yaml` (default `CEM`, via `--filter_in`) and/or runs `run_probes.py --run_name` on each. It checks the CUB layout and that the ResNet-18 ImageNet weights are in the torch hub cache (compute nodes have no internet). Its stdout/stderr go to `logs/slurm/<job>-<id>.{out,err}` (the folder is kept via `.gitkeep`; SLURM won't create it). |
+| `jupyter_job.sh`, `cub_probes_job.sh` | SLURM helpers for the cluster (`cem-probes` conda env). `cub_probes_job.sh [CUB root] [all\|train\|probe] [RUN_NAME ...]` is an `sbatch` script that trains the named runs of `configs/probes/cub_cem.yaml` (default: all runs in the config, via `--filter_in`) and/or runs `run_probes.py --run_name` on each, skipping runs with no trained `{run}_fold_1.pt`. The CUB root defaults to `DEFAULT_CUB_DIR` in the script. It rejects unknown stages/run names and non-existent CUB roots. Its stdout/stderr go to `logs/slurm/<job>-<id>.{out,err}` (the folder is kept via `.gitkeep`; SLURM won't create it). |
 | `setup.py`, `requirements.txt` | Package install metadata and dependencies (Python 3.7–3.8, PyTorch Lightning < 2.0). |
 
 ---

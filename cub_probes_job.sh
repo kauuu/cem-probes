@@ -8,14 +8,20 @@
 #SBATCH --output=logs/slurm/%x-%j.out
 #SBATCH --error=logs/slurm/%x-%j.err
 #
-# Trains the CUB CEM of experiments/configs/probes/cub_cem.yaml and then runs
-# the inter-concept leakage probes on it (experiments/run_probes.py).
+# Trains runs of experiments/configs/probes/cub_cem.yaml (CEM, IntCEM) and then
+# runs the inter-concept leakage probes on them (experiments/run_probes.py).
 #
 # Usage (from the repository root):
-#   sbatch cub_probes_job.sh                            → train + probe
-#   sbatch cub                        → train only
-#   sbatch cub_probes_job.sh probe                      → probe only (needs a trained model)
-#   sbatch cub_probes_job.sh /path/to/CUB200 [stage]    → same, with another CUB root
+#   sbatch cub_probes_job.sh [/path/to/CUB200] [all|train|probe] [RUN_NAME ...]
+#   sbatch cub_probes_job.sh                            → train + probe all runs
+#   sbatch cub_probes_job.sh train                      → train all runs
+#   sbatch cub_probes_job.sh train IntCEM               → train IntCEM only
+#   sbatch cub_probes_job.sh probe IntCEM               → probe IntCEM only (needs a trained model)
+#   sbatch cub_probes_job.sh probe CEM IntCEM           → probe both
+#   sbatch cub_probes_job.sh /path/to/CUB200 [stage] [RUN_NAME ...]  → another CUB root
+# RUN_NAMEs are run_name values of the config; without any, all its runs are
+# used. Already trained runs are loaded instead of retrained, and runs without
+# a trained model are skipped by the probe stage.
 # Any #SBATCH value can be overridden on the command line, e.g.
 #   sbatch --time 08:00:00 cub_probes_job.sh /path/to/CUB200 probe
 #
@@ -45,6 +51,7 @@ if [[ "${STAGE}" != "all" && "${STAGE}" != "train" && "${STAGE}" != "probe" ]]; 
   echo "ERROR: unknown stage '${STAGE}' (expected all, train or probe)"
   exit 1
 fi
+shift $(( $# > 0 ? 1 : 0 ))
 CONFIG=experiments/configs/probes/cub_cem.yaml
 NUM_WORKERS=${SLURM_CPUS_PER_TASK:-8}
 
@@ -54,25 +61,49 @@ conda activate cem-probes
 cd "${SLURM_SUBMIT_DIR:-$(pwd)}"
 export PYTHONPATH="$(pwd):${PYTHONPATH:-}"
 
-echo "Node: $(hostname) | Job: ${SLURM_JOB_ID:-local} | Stage: ${STAGE}"
+# Run names and results directory of the config
+CONFIG_RUNS=($(python -c "import yaml; print(' '.join(r['run_name'] for r in yaml.safe_load(open('${CONFIG}'))['runs']))"))
+RESULTS_DIR=$(python -c "import yaml; print(yaml.safe_load(open('${CONFIG}')).get('results_dir', 'results'))")
+RUNS=("$@")
+if [[ ${#RUNS[@]} -eq 0 ]]; then
+  RUNS=("${CONFIG_RUNS[@]}")
+fi
+for RUN in "${RUNS[@]}"; do
+  if [[ ! " ${CONFIG_RUNS[*]} " == *" ${RUN} "* ]]; then
+    echo "ERROR: unknown run '${RUN}' (runs in ${CONFIG}: ${CONFIG_RUNS[*]})"
+    exit 1
+  fi
+done
+
+echo "Node: $(hostname) | Job: ${SLURM_JOB_ID:-local} | Stage: ${STAGE} | Runs: ${RUNS[*]}"
 echo "CUB root: ${CUB_DIR}"
 nvidia-smi || true
 python -c "import torch; print('torch', torch.__version__, '| CUDA available:', torch.cuda.is_available())"
 
 if [[ "${STAGE}" == "all" || "${STAGE}" == "train" ]]; then
-  echo "=== Training CEM ($(date)) ==="
+  # Only train the requested runs (run_experiments matches {run_name}_split_{n})
+  RUN_REGEX="^($(IFS='|'; echo "${RUNS[*]}"))_split_"
+  echo "=== Training ${RUNS[*]} ($(date)) ==="
   python experiments/run_experiments.py \
     -c "${CONFIG}" \
     --num_workers "${NUM_WORKERS}" \
+    --filter_in "${RUN_REGEX}" \
     -p dataset_config.root_dir "${CUB_DIR}"
 fi
 
 if [[ "${STAGE}" == "all" || "${STAGE}" == "probe" ]]; then
-  echo "=== Running leakage probes ($(date)) ==="
-  python experiments/run_probes.py \
-    -c "${CONFIG}" \
-    -p dataset_config.root_dir "${CUB_DIR}" \
-    -p num_workers "${NUM_WORKERS}"
+  for RUN in "${RUNS[@]}"; do
+    if [[ ! -f "${RESULTS_DIR%/}/${RUN}_fold_1.pt" ]]; then
+      echo "WARNING: skipping probes on ${RUN}: no trained model at ${RESULTS_DIR%/}/${RUN}_fold_1.pt"
+      continue
+    fi
+    echo "=== Running leakage probes on ${RUN} ($(date)) ==="
+    python experiments/run_probes.py \
+      -c "${CONFIG}" \
+      --run_name "${RUN}" \
+      -p dataset_config.root_dir "${CUB_DIR}" \
+      -p num_workers "${NUM_WORKERS}"
+  done
 fi
 
 echo "=== Done ($(date)) ==="
