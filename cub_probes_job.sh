@@ -3,14 +3,10 @@
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
-#SBATCH --mem=8G
+#SBATCH --mem=12G
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/slurm/%x-%j.out
 #SBATCH --error=logs/slurm/%x-%j.err
-#
-# stdout/stderr go to logs/slurm/<job name>-<job id>.{out,err}. SLURM does not
-# create that folder, so it must exist before submitting (it is kept in the
-# repo via logs/slurm/.gitkeep; otherwise run `mkdir -p logs/slurm`).
 #
 # Trains the CUB CEM of experiments/configs/probes/cub_cem.yaml and then runs
 # the inter-concept leakage probes on it (experiments/run_probes.py).
