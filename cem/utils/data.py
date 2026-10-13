@@ -39,7 +39,8 @@ def daloader_to_memory(
                 dl.dataset,
                 batch_size=_largest_divisor(len(dl.dataset), max_val=max_val),
                 num_workers=num_workers,
-                prefetch_factor=prefetch_factor,
+                # torch >= 2.0 only accepts prefetch_factor with workers
+                prefetch_factor=prefetch_factor if num_workers > 0 else None,
             )
         y_data, c_data, g_data = [], [], []
         if not only_labels:

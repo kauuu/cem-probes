@@ -42,7 +42,7 @@ of output classes.
 | `experiments/` | `run_experiments.py` (main CLI), result collection, evaluation glue, and YAML configs. |
 | `examples/` | A walkthrough notebook training a CEM on the synthetic Dot dataset. |
 | `figures/`, `media/` | Images used in the README; paper poster and slides. |
-| `jupyter_job.sh`, `cub_probes_job.sh` | SLURM helpers for the cluster (`cem-probes` conda env). `cub_probes_job.sh <CUB root> [all\|train\|probe]` is an `sbatch` script that trains `configs/probes/cub_cem.yaml` and/or runs `run_probes.py` on it. Its stdout/stderr go to `logs/slurm/<job>-<id>.{out,err}` (the folder is kept via `.gitkeep`; SLURM won't create it). |
+| `jupyter_job.sh`, `cub_probes_job.sh` | SLURM helpers for the cluster (`cem-probes` conda env). `cub_probes_job.sh <CUB root> [all\|train\|probe] [RUN_NAME ...]` is an `sbatch` script that trains the named runs of `configs/probes/cub_cem.yaml` (default `CEM`, via `--filter_in`) and/or runs `run_probes.py --run_name` on each. It checks the CUB layout and that the ResNet-18 ImageNet weights are in the torch hub cache (compute nodes have no internet). Its stdout/stderr go to `logs/slurm/<job>-<id>.{out,err}` (the folder is kept via `.gitkeep`; SLURM won't create it). |
 | `setup.py`, `requirements.txt` | Package install metadata and dependencies (Python 3.7–3.8, PyTorch Lightning < 2.0). |
 
 ---
@@ -427,7 +427,7 @@ YAML experiment definitions. Each has `shared_params` (`results_dir`, `trials`, 
 | Path | Contents |
 |---|---|
 | `configs/*.yaml` | Main experiments per dataset (`cub`, `awa2`, `celeba`, `cifar10`, `mnist_add`, `travelingbirds`, synthetic `xor`/`trig`/`dot`). `*_incomplete.yaml` = concept-incomplete variants. |
-| `configs/probes/cub_cem.yaml` | Thesis config: the CEM run from `cub.yaml` only (1 trial, random group-level interventions, no OOD sets), `results_dir: results/cub_probes/`, plus a `probe_config` block for `run_probes.py` and `csv_logger: true` for offline training curves. |
+| `configs/probes/cub_cem.yaml` | Thesis config: the CEM and IntCEM runs from `cub.yaml` only (1 trial, random group-level interventions, no OOD sets), `results_dir: results/cub_probes/`, plus a `probe_config` block for `run_probes.py` and `csv_logger: true` for offline training curves. |
 | `configs/hyper_searches/` | Hyperparameter sweep versions of the main configs. |
 | `configs/additional_experiments/ablations/` | Completeness and noise ablations (CUB, AwA2, MixCEM). |
 | `configs/additional_experiments/mnist_domain_shift_experiments/` | Colour-MNIST → SVHN domain-shift experiments. |
@@ -449,6 +449,9 @@ YAML experiment definitions. Each has `shared_params` (`results_dir`, `trials`, 
 
 - `cem.data.siim_arc_loader` does not exist in this repo. `experiments/run_experiments.py` now imports it inside a `try/except` and only raises if a `siim` dataset is requested.
 - `run_experiments.py` reads `results_dir` from the **top level** of the YAML (`loaded_config['results_dir']`), so configs that only set it under `shared_params` (e.g. `cub.yaml`) crash unless `-o` is passed.
+- `cem/utils/data.py::daloader_to_memory` used to pass `prefetch_factor` even with `num_workers=0`, which torch >= 2.0 rejects (crashed `evaluate_cbm` with `num_load_workers: 0`). It is now only passed when there are workers.
+- `run_experiments.main` calls `torch.cuda.ipc_collect()` after every run, which raises on machines without CUDA (e.g. local Macs) once a run has finished and been saved.
+- `cem/train/utils.py::wrap_pretrained_model` swallows any error from building a torchvision backbone (e.g. failing to download ImageNet weights without internet) and retries with `output_dim=`, so the reported error is a misleading `TypeError: ... unexpected keyword argument 'output_dim'`.
 - `load_trained_model` calls `torch.load` without `map_location`, so a checkpoint saved on GPU can only be loaded on a machine with CUDA.
 - `cem/metrics/oracle.py` and `cem/train/evaluate.py` import `tensorflow`, and `cem/metrics/cas.py` imports `sklearn_extra`. `tensorflow` is not listed in `requirements.txt`/`setup.py`. Since every trainer imports `evaluate.py`, both packages are required for any training run. `environment.yml` (Mac, osx-64) and `environment.cuda.yml` (cluster) pin compatible versions.
 - In `ConceptEmbeddingModel.__init__`, `inactive_intervention_values` defaults to **ones** (not zeros). This doesn't affect CEM interventions, which use `c_true` directly.
