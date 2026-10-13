@@ -1,11 +1,12 @@
-# CEM on CUB for the inter-concept leakage probing study.
+# CEM and IntCEM on CUB for the inter-concept leakage probing study.
 #
-# Same CEM run and shared params as experiments/configs/cub.yaml, but with only
-# the CEM run, no OOD test sets and only the random (group-level) intervention
-# baseline. Train with:
+# Same CEM/IntCEM runs and shared params as experiments/configs/cub.yaml, but
+# without the other architectures, the OOD test sets and the non-random
+# intervention policies. Train with (add --filter_in "^IntCEM_" for one run):
 #   python experiments/run_experiments.py -c experiments/configs/probes/cub_cem.yaml
-# and then probe the trained model with:
-#   python experiments/run_probes.py -c experiments/configs/probes/cub_cem.yaml
+# and then probe each trained model with:
+#   python experiments/run_probes.py -c experiments/configs/probes/cub_cem.yaml --run_name CEM
+#   python experiments/run_probes.py -c experiments/configs/probes/cub_cem.yaml --run_name IntCEM
 trials: 1
 results_dir: "results/cub_probes/"
 
@@ -77,3 +78,18 @@ runs:
     sigmoidal_prob: true
     training_intervention_prob: 0.25
     embedding_activation: "leakyrelu"
+
+  # Same IntCEM run (and hyperparameters) as experiments/configs/cub.yaml
+  - architecture: "IntAwareConceptEmbeddingModel"
+    run_name: "IntCEM"
+    concept_loss_weight: 1
+    training_intervention_prob: 0.25
+    intervention_weight: 1
+    intervention_task_discount: 1.5
+    use_concept_groups: true
+    int_model_use_bn: true
+    int_model_layers: [128, 128, 64, 64]
+    embedding_activation: "leakyrelu"
+    max_horizon: 6
+    horizon_rate: 1.005
+    gradient_clip_val: 100

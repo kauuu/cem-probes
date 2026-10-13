@@ -49,6 +49,13 @@ for required in "${CUB_DIR}class_attr_data_10/train.pkl" "${CUB_DIR}CUB_200_2011
     exit 1
   fi
 done
+# Compute nodes have no internet, so the ImageNet weights of the ResNet-18
+# backbone must already be in the torch hub cache (download them once on the
+# login node: python -c "import torchvision; torchvision.models.resnet18(weights='IMAGENET1K_V1')")
+if ! python -c "import glob, os, sys, torch; sys.exit(not glob.glob(os.path.join(torch.hub.get_dir(), 'checkpoints', 'resnet18-*.pth')))"; then
+  echo "ERROR: pretrained ResNet-18 weights not found in the torch hub cache; download them on the login node first (see this script)"
+  exit 1
+fi
 nvidia-smi || true
 python -c "import torch; print('torch', torch.__version__, '| CUDA available:', torch.cuda.is_available())"
 
